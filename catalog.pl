@@ -34,6 +34,7 @@ my $dom;
 my $ua = Mojo::UserAgent->new;
 
 if (my $file = shift @ARGV) {
+  say "Using local Catalog file $file";
   $dom = Mojo::DOM->new(decode 'UTF-16', slurp $file);
 } else {
   my $tx = $ua->build_tx(GET => 'http://pastebin.cloud.servercentral.com/uploads-public/99fb1f02fc04b72bbf899ce847e7f0c6/Catalog.xml');
@@ -48,6 +49,13 @@ for my $model (@models) {
   });
   push @models_found, $found if $found;
 }
+
+# XML parse you long time.
+# Build an array of SoftwareComponent paths once vs. iterating per-model
+my @sw_components;
+my @wtf_dis = $dom->find('SoftwareComponent')->map->{path}->each;
+print @wtf_dis;
+exit 0;
 
 my @urls;
 for my $found (@models_found) {
@@ -67,6 +75,7 @@ for my $found (@models_found) {
   });
 }
 
+# TODO: We could probably start background downloading while we parse XML for additional models...
 Fetch() for 1..$concurrency;
 
 sub Fetch {
@@ -75,11 +84,11 @@ sub Fetch {
   my $bundle = $h->{bundle};
   my $url = $h->{url};
   my $fn = basename($url);
-  say "Starting on $url for bundle $bundle saving as $prefix/$bundle/$fn";
+  say "Starting on Bundle: $bundle saving to $bundle/$fn";
   $ua->get($host . $url, sub{
-    say "Finished $url (saved to $prefix/$bundle/$fn)";
     my ($ua, $tx) = @_;
     $tx->res->content->asset->move_to("$prefix/$bundle/$fn");
+    say "Finished $bundle (saved to $prefix/$bundle/$fn)";
     Fetch();
   });
 }
