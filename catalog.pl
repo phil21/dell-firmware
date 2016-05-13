@@ -12,7 +12,23 @@ use strict;
 use warnings;
 
 my $host = 'http://downloads.dell.com/';
+
+# Where to put the Dell update bundle 
 my $prefix = "/home/phil21/delltest";
+# Number of simultaneous downloads
+my $concurrency = 20;
+
+# Model numbers to build bundles for
+# FIXME: Use the more reliable hex model number here
+my @models = (
+  'R420',
+  'R430',
+  'R620',
+  'R630',
+  'R910',
+  'R920',
+  'R930',
+);
 
 my $dom;
 my $ua = Mojo::UserAgent->new;
@@ -25,32 +41,31 @@ if (my $file = shift @ARGV) {
   $dom = $ua->start($tx)->res->dom;
 }
 
-my $found = $dom->find('SoftwareBundle[bundleType="BTLX"]')->grep(sub{
-  $_->at('TargetSystems Model Display')->text eq 'R420';
-});
+my @models_found;
+for my $model (@models) {
+  my $found = $dom->find('SoftwareBundle[bundleType="BTLX"]')->grep(sub{
+    $_->at('TargetSystems Model Display')->text eq $model;
+  });
+  push @models_found, $found if $found;
+}
 
-my @display;
 my @urls;
-$found->each(sub{
-  my $item = $_->at('Description Display')->text;
-  push @display, $item;
-  say "Starting on $item";
-  make_path("$prefix/$item");
-  my @packages = $_->find('Contents Package')->map(sub{ $_->{path} })->each;
-  for my $pkg (@packages) {
-    #push (@urls, $dom->at(qq/SoftwareComponent[path\$="$pkg"]/)->{path});
-    #push(@{ $files{$item} }, $dom->at(qq/SoftwareComponent[path\$="$pkg"]/)->{path});
-    my %h;
-    $h{bundle} = $item;
-    $h{url} = $dom->at(qq/SoftwareComponent[path\$="$pkg"]/)->{path};
-    push @urls, \%h;
-  }
-});
-
-
-#say for @urls;
-
-my $concurrency = 20;
+for my $found (@models_found) {
+  $found->each(sub{
+    my $item = $_->at('Description Display')->text;
+    say "Starting on $item";
+    make_path("$prefix/$item");
+    my @packages = $_->find('Contents Package')->map(sub{ $_->{path} })->each;
+    for my $pkg (@packages) {
+      #push (@urls, $dom->at(qq/SoftwareComponent[path\$="$pkg"]/)->{path});
+      #push(@{ $files{$item} }, $dom->at(qq/SoftwareComponent[path\$="$pkg"]/)->{path});
+      my %h;
+      $h{bundle} = $item;
+      $h{url} = $dom->at(qq/SoftwareComponent[path\$="$pkg"]/)->{path};
+      push @urls, \%h;
+    }
+  });
+}
 
 Fetch() for 1..$concurrency;
 
