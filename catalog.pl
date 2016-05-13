@@ -52,10 +52,7 @@ for my $model (@models) {
 
 # XML parse you long time.
 # Build an array of SoftwareComponent paths once vs. iterating per-model
-my @sw_components;
-my @wtf_dis = $dom->find('SoftwareComponent')->map->{path}->each;
-print @wtf_dis;
-exit 0;
+my %pkg_map = map { basename($_) => $_ } $dom->find('SoftwareComponent')->map(sub{ $_->{path} })->each;
 
 my @urls;
 for my $found (@models_found) {
@@ -65,17 +62,16 @@ for my $found (@models_found) {
     make_path("$prefix/$item");
     my @packages = $_->find('Contents Package')->map(sub{ $_->{path} })->each;
     for my $pkg (@packages) {
-      #push (@urls, $dom->at(qq/SoftwareComponent[path\$="$pkg"]/)->{path});
-      #push(@{ $files{$item} }, $dom->at(qq/SoftwareComponent[path\$="$pkg"]/)->{path});
       my %h;
       $h{bundle} = $item;
-      $h{url} = $dom->at(qq/SoftwareComponent[path\$="$pkg"]/)->{path};
+      #      $h{url} = $dom->at(qq/SoftwareComponent[path\$="$pkg"]/)->{path};
+      $h{url} = $pkg_map{$pkg};
+      say $h{url};
       push @urls, \%h;
     }
   });
 }
 
-# TODO: We could probably start background downloading while we parse XML for additional models...
 Fetch() for 1..$concurrency;
 
 sub Fetch {
