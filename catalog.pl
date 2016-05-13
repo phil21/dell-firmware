@@ -33,14 +33,23 @@ my @models = (
 my $dom;
 my $ua = Mojo::UserAgent->new;
 
-if (my $file = shift @ARGV) {
+my $file;
+if ($file = shift @ARGV) {
   say "Using local Catalog file $file";
-  $dom = Mojo::DOM->new(decode 'UTF-16', slurp $file);
 } else {
-  my $tx = $ua->build_tx(GET => 'http://pastebin.cloud.servercentral.com/uploads-public/99fb1f02fc04b72bbf899ce847e7f0c6/Catalog.xml');
-  $tx->res->max_message_size(0)->default_charset('UTF-16');
-  $dom = $ua->start($tx)->res->dom;
+  # Download Cabinet file from downloads.dell.com and extract
+  print "Downloading Catalog... ";
+  my $tx = $ua->get($host . 'Catalog.cab', sub{
+    my ($ua, $tx) = @_;
+    $tx->res->content->asset->move_to('/tmp/dell-Catalog.cab');
+    say "Done.";
+  });
+  print "Extracting Catalog... ";
+  system('cabextract -F Catalog.xml -d /tmp /tmp/dell-Catalog.cab') or die "Cabinet file extraction failed.";
+  $file = "/tmp/Catalog.xml";
+  say "Done.";
 }
+$dom = Mojo::DOM->new(decode 'UTF-16', slurp $file) or die "Cannot parse XML!\n";
 
 my @models_found;
 for my $model (@models) {
@@ -88,7 +97,6 @@ sub Fetch {
     Fetch();
   });
 }
-
 
 Mojo::IOLoop->start;
 
